@@ -114,15 +114,15 @@ option = [{ name = "lukadev_0/option", version = "^1.2.1", index = "https://gith
 std = [{ name = "lukadev_0/std", version = "^1.0.2", index = "https://github.com/daimond113/pesde-index", target = "roblox" }, "standard"]
 threadpool = [{ name = "lukadev_0/threadpool", version = "^1.0.2", index = "https://github.com/daimond113/pesde-index", target = "roblox" }, "standard"]
 
-[graph."lukadev_0/option@1.2.0 lune".pkg_ref]
-ref_ty = "pesde"
-index_url = "https://github.com/pesde-pkg/index"
-
 [graph."lukadev_0/option@1.2.1 roblox".pkg_ref]
 ref_ty = "pesde"
 index_url = "https://github.com/daimond113/pesde-index"
 
-[graph."lukadev_0/result@1.2.0 lune".pkg_ref]
+[graph."lukadev_0/option@1.2.1 lune".pkg_ref]
+ref_ty = "pesde"
+index_url = "https://github.com/pesde-pkg/index"
+
+[graph."lukadev_0/result@1.2.1 lune".pkg_ref]
 ref_ty = "pesde"
 index_url = "https://github.com/pesde-pkg/index"
 
@@ -145,8 +145,8 @@ direct = ["rojo", { name = "pesde/rojo", version = "^7.4.4", index = "default", 
 
 [graph."pesde/rojo@7.5.1 lune".dependencies]
 core = ["pesde/toolchainlib@0.1.15 lune", "standard"]
-option = ["lukadev_0/option@1.2.0 lune", "standard"]
-result = ["lukadev_0/result@1.2.0 lune", "standard"]
+option = ["lukadev_0/option@1.2.1 lune", "standard"]
+result = ["lukadev_0/result@1.2.1 lune", "standard"]
 
 [graph."pesde/rojo@7.5.1 lune".pkg_ref]
 ref_ty = "pesde"
@@ -186,9 +186,9 @@ rojo = [{ name = "pesde/rojo", version = "^7.4.4", index = "https://github.com/p
 
 [graph."pesde/toolchainlib@0.1.15 lune".dependencies]
 dirs = ["jiwonz/dirs@0.3.0 lune", "standard"]
-option = ["lukadev_0/option@1.2.0 lune", "peer"]
+option = ["lukadev_0/option@1.2.1 lune", "peer"]
 pathfs = ["jiwonz/pathfs@0.3.2 lune", "standard"]
-result = ["lukadev_0/result@1.2.0 lune", "peer"]
+result = ["lukadev_0/result@1.2.1 lune", "peer"]
 unzip = ["0x5eal/unzip@0.1.3 luau", "standard"]
 
 [graph."pesde/toolchainlib@0.1.15 lune".pkg_ref]
