@@ -1,0 +1,9 @@
+{
+  "name": "Store",
+  "tree": {
+    "$path": "lib",
+    "packages": {
+      "$path": "roblox_packages"
+    }
+  }
+}

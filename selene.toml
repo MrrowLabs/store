@@ -1,0 +1,10 @@
+std = "luau+roblox"
+exclude = [
+  "roblox_packages/*",
+  "luau_packages/*",
+  "lune_packages/*",
+  ".pesde/*",
+]
+
+[lints]
+shadowing = "allow"
