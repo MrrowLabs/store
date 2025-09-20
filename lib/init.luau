@@ -117,7 +117,27 @@ function Store.load<K, T, M>(
 
 	return Result.match(retry(1, options.force), {
 		Ok = function(session)
+			local autosaveThread = task.spawn(function()
+				if not self.options.autosaveInterval then
+					return
+				end
+
+				while task.wait(self.options.autosaveInterval) do
+					session:save():match({
+						Ok = function()
+							print(`successfully saved {normalizedKey}`)
+							return nil
+						end,
+						Err = function(message)
+							warn(`failed to save {normalizedKey} due to {message}`)
+							return nil
+						end,
+					})
+				end
+			end)
+
 			session.released:connect(function()
+				task.cancel(autosaveThread)
 				self.sessions[normalizedKey] = nil
 			end)
 

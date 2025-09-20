@@ -13,6 +13,7 @@ export type DataStoreKeyInfoMetadata<T> = {
 export type StoreOptions<K, T, M = {}> = {
 	maxLoadRetries: number?,
 	loadDelays: { number }?,
+	autosaveInterval: number?,
 	key: (input: K) -> string,
 	lockId: string,
 	defaultMetadata: () -> M,
