@@ -1,5 +1,3 @@
-local DataStoreService = game:GetService("DataStoreService")
-
 local Result = require(script.Result)
 local Session = require(script.Session)
 local SessionData = require(script.SessionData)
@@ -11,9 +9,9 @@ local utils = require(script.utils)
 local Store = {}
 Store.__index = Store
 
-function Store.new<K, T, M>(name: string, scope: string | "global", options: types.StoreOptions<K, T>): types.Store<K, T, M>
+function Store.new<K, T, M>(options: types.StoreOptions<K, T>): types.Store<K, T, M>
 	return setmetatable({
-		dataStore = DataStoreService:GetDataStore(name, scope),
+		dataStore = options.datastore,
 		options = options,
 		sessions = {},
 		closing = false,

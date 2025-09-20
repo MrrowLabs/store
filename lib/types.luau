@@ -11,6 +11,7 @@ export type DataStoreKeyInfoMetadata<T> = {
 }
 
 export type StoreOptions<K, T, M = {}> = {
+	datastore: DataStore,
 	maxLoadRetries: number?,
 	loadDelays: { number }?,
 	autosaveInterval: number?,
