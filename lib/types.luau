@@ -3,6 +3,18 @@ local Signal = require(script.Parent.packages.Signal)
 
 export type Migrations = { [number]: (inner: any) -> any? }
 
+export type BaseStoreResult<T, M = nil> = {
+	type: T,
+	message: M,
+}
+
+export type StoreResult =
+	BaseStoreResult<"DataStoreAPIError", string>
+	| BaseStoreResult<"MigrationError", string>
+	| BaseStoreResult<"SessionLocked">
+	| BaseStoreResult<"StoreClosed">
+	| BaseStoreResult<"SessionReleased">
+
 export type DataStoreKeyInfoMetadata<T> = {
 	inner: T,
 	version: number,
@@ -35,14 +47,13 @@ export type Store<K, T, M = {}> = typeof(setmetatable(
 		dataStore: DataStore,
 		options: StoreOptions<K, T, M>,
 		sessions: { [string]: Session<K, T, M> },
-		closing: boolean,
-		isClosed: boolean,
+		closed: boolean,
 	},
 	{} :: {
 		__index: {
-			load: (self: Store<K, T, M>, key: K) -> Result.Result<Session<K, T, M>, string>,
+			load: (self: Store<K, T, M>, key: K) -> Result.Result<Session<K, T, M>, StoreResult>,
 			get: (self: Store<K, T, M>, key: K) -> Session<K, T, M>?,
-			close: (self: Store<K, T, M>) -> { Result.Result<nil, string> },
+			close: (self: Store<K, T, M>) -> { Result.Result<nil, StoreResult> },
 		},
 	}
 ))
@@ -57,7 +68,6 @@ export type Session<K, T, M = {}> = typeof(setmetatable(
 		store: Store<K, T, M>,
 		key: K,
 		data: SessionData<T, M>,
-		releasing: boolean,
 		isReleased: boolean,
 		updated: Signal.Signal<{ DataChange }>,
 		released: Signal.Signal<>,
@@ -66,8 +76,8 @@ export type Session<K, T, M = {}> = typeof(setmetatable(
 		__index: {
 			peek: (self: Session<K, T, M>) -> T,
 			update: (self: Session<K, T, M>, fn: (T) -> ()) -> (),
-			save: (self: Session<K, T, M>) -> Result.Result<nil, string>,
-			release: (self: Session<K, T, M>) -> Result.Result<nil, string>,
+			save: (self: Session<K, T, M>) -> Result.Result<nil, StoreResult>,
+			release: (self: Session<K, T, M>) -> Result.Result<nil, StoreResult>,
 		},
 	}
 ))

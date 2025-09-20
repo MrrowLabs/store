@@ -14,8 +14,7 @@ function Store.new<K, T, M>(options: types.StoreOptions<K, T>): types.Store<K, T
 		dataStore = options.datastore,
 		options = options,
 		sessions = {},
-		closing = false,
-		isClosed = false,
+		closed = false,
 	}, Store) :: any
 end
 
@@ -28,8 +27,10 @@ function Store.load<K, T, M>(
 	self: types.Store<K, T, M>,
 	key: K,
 	options: LoadOptions?
-): Result.Result<types.Session<K, T, M>, string>
-	assert(not self.closing and not self.isClosed, "cannot load in a closing/closed store")
+): Result.Result<types.Session<K, T, M>, types.StoreResult>
+	if self.closed then
+		return Result.Err(utils.createStoreResult("StoreClosed"))
+	end
 
 	local options: LoadOptions = options or {}
 	local normalizedKey = self.options.key(key)
@@ -38,12 +39,12 @@ function Store.load<K, T, M>(
 		return Result.Ok(self.sessions[normalizedKey])
 	end
 
-	local function attemptLoad(force: boolean?): Result.Result<types.Session<K, T, M>, Result.Result<string, string>>
-		if self.closing or self.isClosed then
-			return Result.Err(Result.Err("aborting load due to an aready closing/closed store"))
+	local function attemptLoad(force: boolean?): Result.Result<types.Session<K, T, M>, types.StoreResult>
+		if self.closed then
+			return Result.Err(utils.createStoreResult("StoreClosed"))
 		end
 
-		local session: Result.Result<types.Session<K, T, M>, Result.Result<string, string>>
+		local session: Result.Result<types.Session<K, T, M>, types.StoreResult>
 
 		local result = utils.updateAsync(self.dataStore, normalizedKey, function(rawData, dataStoreKeyInfo)
 			local sessionData
@@ -54,16 +55,9 @@ function Store.load<K, T, M>(
 				sessionData = SessionData.from(rawData, self.options.defaultMetadata(), dataStoreKeyInfo)
 
 				if not SessionData.doesOwn(sessionData, self.options.lockId) and not force then
-					session = Result.Err(Result.Ok(`{normalizedKey} has a locked session`))
+					session = Result.Err(utils.createStoreResult("SessionLocked"))
 					return
 				end
-			end
-
-			local migrationResult = SessionData.migrate(sessionData, self.options.migrations)
-
-			if migrationResult:isErr() then
-				session = Result.Err(Result.Err(migrationResult:unwrapErr()))
-				return
 			end
 
 			SessionData.own(sessionData, self.options.lockId)
@@ -76,39 +70,47 @@ function Store.load<K, T, M>(
 		end)
 
 		if result:isErr() then
-			return Result.Err(Result.Err(result:unwrapErr()))
+			return Result.Err(utils.createStoreResult("DataStoreAPIError", result:unwrapErr()))
 		end
 
-		return session
+		return session:match({
+			Ok = function(session)
+				local migrationResult = SessionData.migrate(session.data, self.options.migrations)
+
+				if migrationResult:isErr() then
+					return Result.Err(utils.createStoreResult("MigrationError", migrationResult:unwrapErr()))
+				end
+
+				return Result.Ok(session)
+			end,
+			Err = function(err)
+				return Result.Err(err)
+			end,
+		})
 	end
 
-	local function retry(attempt: number, force: boolean?): Result.Result<types.Session<K, T, M>, string>
+	local function retry(attempt: number, force: boolean?): Result.Result<types.Session<K, T, M>, types.StoreResult>
 		return Result.match(attemptLoad(force), {
 			Ok = function(session)
 				return Result.Ok(session)
 			end,
-			Err = function(errorResult)
-				return Result.match(errorResult, {
-					Ok = function(message)
-						local maxLoadRetries = self.options.maxLoadRetries or constants.DEFAULT_MAX_LOAD_RETRIES
-						local loadDelays = self.options.loadDelays or constants.DEFAULT_LOAD_RETRY_DELAYS
+			Err = function(storeResult)
+				if storeResult.type == "DataStoreAPIError" then
+					return Result.Err(utils.createStoreResult("DataStoreAPIError", storeResult.message))
+				end
 
-						if attempt > maxLoadRetries then
-							warn(`forcing ownership of {normalizedKey} as the previous lockId will not release it`)
-							return retry(attempt + 1, true)
-						end
+				local maxLoadRetries = self.options.maxLoadRetries or constants.DEFAULT_MAX_LOAD_RETRIES
+				local loadDelays = self.options.loadDelays or constants.DEFAULT_LOAD_RETRY_DELAYS
 
-						warn(
-							`failed to load session for {normalizedKey} for {message}. attempt {attempt} / {maxLoadRetries}`
-						)
-						task.wait(loadDelays[math.min(attempt, #loadDelays)])
+				if attempt > maxLoadRetries then
+					warn(`forcing ownership of {normalizedKey} as the previous lockId will not release it`)
+					return retry(attempt + 1, true)
+				end
 
-						return retry(attempt + 1)
-					end,
-					Err = function(err)
-						return Result.Err(err)
-					end,
-				})
+				warn(`failed to load session for {normalizedKey} for {""}. attempt {attempt} / {maxLoadRetries}`)
+				task.wait(loadDelays[math.min(attempt, #loadDelays)])
+
+				return retry(attempt + 1)
 			end,
 		})
 	end
@@ -150,19 +152,19 @@ function Store.load<K, T, M>(
 end
 
 function Store.get<K, T, M>(self: types.Store<K, T, M>, key: K): types.Session<K, T, M>?
-	assert(not self.closing and not self.isClosed, "store is closing or is closed")
+	assert(not self.closed, "store is closed")
 	return self.sessions[self.options.key(key)]
 end
 
 type CloseResult<K> = {
 	key: K,
-	result: Result.Result<nil, string>,
+	result: Result.Result<nil, types.StoreResult>,
 }
 
 function Store.close<K, T, M>(self: types.Store<K, T, M>): { CloseResult<K> }
-	assert(not self.closing and not self.isClosed, "store is already being closed or is closed")
+	assert(not self.closed, "store is already closed")
 
-	self.closing = true
+	self.closed = true
 
 	local futures: { Future.Future<CloseResult<K>> } = {}
 
@@ -183,11 +185,7 @@ function Store.close<K, T, M>(self: types.Store<K, T, M>): { CloseResult<K> }
 		)
 	end
 
-	local results = Future.all(futures):await()
-
-	self.isClosed = true
-
-	return results
+	return Future.all(futures):await()
 end
 
 export type Store<K, T, M = {}> = types.Store<K, T, M>

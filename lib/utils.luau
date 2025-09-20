@@ -1,4 +1,5 @@
 local Result = require(script.Parent.Result)
+local types = require(script.Parent.types)
 
 local utils = {}
 
@@ -17,6 +18,13 @@ function utils.updateAsync(
 	end
 
 	return Result.Ok(nil)
+end
+
+function utils.createStoreResult(type: string, message: string?): types.StoreResult
+	return {
+		type = type,
+		message = message,
+	} :: any
 end
 
 return utils

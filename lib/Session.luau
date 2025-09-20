@@ -11,7 +11,6 @@ function Session.new<K, T, M>(store: types.Store<K, T, M>, key: K, sessionData: 
 		store = store,
 		key = key,
 		data = sessionData,
-		releasing = false,
 		isReleased = false,
 		updated = Signal.new(),
 		released = Signal.new(),
@@ -19,13 +18,13 @@ function Session.new<K, T, M>(store: types.Store<K, T, M>, key: K, sessionData: 
 end
 
 function Session.peek<K, T, M>(self: types.Session<K, T, M>): T
-	assert(not self.releasing and not self.isReleased, `cannot update releasing/released data`)
+	assert(not self.isReleased, `cannot update released session`)
 
 	return self.data.inner
 end
 
 function Session.update<K, T, M>(self: types.Session<K, T, M>, fn: (T) -> ())
-	assert(not self.releasing and not self.isReleased, `cannot update releasing/released data`)
+	assert(not self.isReleased, `cannot update released session`)
 
 	local changes: { types.DataChange } = {}
 
@@ -89,8 +88,8 @@ function Session.update<K, T, M>(self: types.Session<K, T, M>, fn: (T) -> ())
 	self.updated:fire(changes)
 end
 
-function Session.save<K, T, M>(self: types.Session<K, T, M>): Result.Result<nil, string>
-	assert(not self.releasing and not self.isReleased, `cannot save releasing/released data`)
+function Session.save<K, T, M>(self: types.Session<K, T, M>): Result.Result<nil, types.StoreResult>
+	assert(not self.isReleased, `cannot save released data`)
 
 	local normalizedKey = self.store.options.key(self.key)
 
@@ -99,16 +98,16 @@ function Session.save<K, T, M>(self: types.Session<K, T, M>): Result.Result<nil,
 	end)
 
 	if result:isErr() then
-		return Result.Err(result:unwrapErr())
+		return Result.Err(utils.createStoreResult("DataStoreAPIError", result:unwrapErr()))
 	end
 
 	return Result.Ok(nil)
 end
 
-function Session.release<K, T, M>(self: types.Session<K, T, M>): Result.Result<nil, string>
-	assert(not self.releasing and not self.isReleased, `session is already being released or is released`)
+function Session.release<K, T, M>(self: types.Session<K, T, M>): Result.Result<nil, types.StoreResult>
+	assert(not self.isReleased, `session is already being released`)
 
-	self.releasing = true
+	self.isReleased = true
 
 	SessionData.release(self.data)
 
@@ -118,10 +117,13 @@ function Session.release<K, T, M>(self: types.Session<K, T, M>): Result.Result<n
 		return SessionData.export(self.data)
 	end)
 
-	self.isReleased = true
 	self.released:fire()
 
-	return result
+	if result:isErr() then
+		return Result.Err(utils.createStoreResult("DataStoreAPIError", result:unwrapErr()))
+	end
+
+	return Result.Ok(nil)
 end
 
 return Session
