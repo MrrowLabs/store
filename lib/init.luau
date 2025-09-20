@@ -95,8 +95,8 @@ function Store.load<K, T, M>(
 				return Result.Ok(session)
 			end,
 			Err = function(storeResult)
-				if storeResult.type == "DataStoreAPIError" then
-					return Result.Err(utils.createStoreResult("DataStoreAPIError", storeResult.message))
+				if storeResult.type == "DataStoreAPIError" or storeResult.type == "MigrationError" then
+					return Result.Err(utils.createStoreResult(storeResult.type, storeResult.message))
 				end
 
 				local maxLoadRetries = self.options.maxLoadRetries or constants.DEFAULT_MAX_LOAD_RETRIES
@@ -107,7 +107,11 @@ function Store.load<K, T, M>(
 					return retry(attempt + 1, true)
 				end
 
-				warn(`failed to load session for {normalizedKey} for {""}. attempt {attempt} / {maxLoadRetries}`)
+				warn(
+					`failed to load session for {normalizedKey} for {storeResult.type}{if storeResult.message
+						then `, {storeResult.message}`
+						else ""}. attempt {attempt} / {maxLoadRetries}`
+				)
 				task.wait(loadDelays[math.min(attempt, #loadDelays)])
 
 				return retry(attempt + 1)
